@@ -54,9 +54,15 @@ app.use(session({
   saveUninitialized: false,
   cookie: { maxAge: 604800000 },
 }))
-if (config.discord.enabled) {
-  // eslint-disable-next-line global-require
-  require('./strategies/discordStrategy')
+if (config.enabledAuthMethods.length > 0) {
+  if (config.enabledAuthMethods.includes('discord')) {
+    // eslint-disable-next-line global-require
+    require('./strategies/discordStrategy')
+  }
+  if (config.enabledAuthMethods.includes('customAuth')) {
+    // eslint-disable-next-line global-require
+    require('./strategies/localStrategy')
+  }
 
   app.use(passport.initialize())
 

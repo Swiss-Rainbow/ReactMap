@@ -241,6 +241,9 @@
   "primary": "Primary",
   "secondary": "Secondary",
   "zeroIv": "Add 0% IV",
+  "username": "Username",
+  "password": "Password",
+  "orUseDiscord": "or log in with Discord",
   "openMenu": "Open Menu",
   "zoomIn": "Zoom In",
   "zoomOut": "Zoom Out"
