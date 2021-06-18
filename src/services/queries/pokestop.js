@@ -38,8 +38,6 @@ const quest = gql`
     mega_pokemon_id
     mega_amount
     quest_task
-    candy_pokemon_id
-    candy_amount
   }
 `
 

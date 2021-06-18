@@ -124,7 +124,6 @@ function fetchJson(url) {
           rarity: getRarityLevel(i, pkmn),
           evolutions: pkmn.evolutions,
           temp_evolutions: pkmn.temp_evolutions,
-          family: pkmn.family,
         }
       }
     }
