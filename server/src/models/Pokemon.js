@@ -69,8 +69,11 @@ class Pokemon extends Model {
   }
 
   static async initOhbem() {
-    const leagueObj = {}
-    leagues.forEach(league => leagueObj[league.name] = league.cp)
+    const leagueObj = Object.fromEntries(leagues.map(league => [league.name, league.cp]))
+    const hasLittle = leagues.find(league => league.name === 'little')
+    if (hasLittle) {
+      leagueObj.little = hasLittle.littleCupRules ? 500 : { little: false, cap: 500 }
+    }
     ohbem = new Ohbem({
       leagues: leagueObj,
       pokemonData: await Ohbem.fetchPokemonData(),
@@ -80,14 +83,14 @@ class Pokemon extends Model {
   }
 
   static async getPokemon(args, perms, isMad) {
-    const ts = Math.floor((new Date()).getTime() / 1000)
     const {
       stats, iv: ivs, pvp, areaRestrictions,
     } = perms
     const {
-      onlyStandard, onlyIvOr, onlyXlKarp, onlyXsRat, onlyZeroIv, onlyHundoIv, onlyPvpMega, onlyLinkGlobal,
+      onlyStandard, onlyIvOr, onlyXlKarp, onlyXsRat, onlyZeroIv, onlyHundoIv, onlyPvpMega, onlyLinkGlobal, ts,
     } = args.filters
     let queryPvp = false
+    const safeTs = ts || Math.floor((new Date()).getTime() / 1000)
 
     // quick check to make sure no Pokemon are returned when none are enabled for users with only Pokemon perms
     if (!ivs && !stats && !pvp) {
@@ -198,12 +201,23 @@ class Pokemon extends Model {
 
     const globalCheck = (pkmn) => onlyLinkGlobal ? args.filters[`${pkmn.pokemon_id}-${pkmn.form}`] : true
 
+    const handleDitto = (pkmn) => {
+      pkmn.ditto_form = pkmn.form
+      pkmn.form = masterfile[pkmn.pokemon_id].defaultFormId
+      const statsToCheck = ['atk', 'def', 'sta']
+      statsToCheck.forEach(stat => {
+        if (!pkmn[`${stat}_iv`] && pkmn[`${stat}_inactive`]) {
+          pkmn[`${stat}_iv`] = pkmn[`${stat}_inactive`]
+          pkmn.inactive_stats = true
+        }
+      })
+    }
     // query builder
     const query = this.query()
     if (isMad) {
       getMadSql(query)
     }
-    query.where(isMad ? 'disappear_time' : 'expire_timestamp', '>=', isMad ? this.knex().fn.now() : ts)
+    query.where(isMad ? 'disappear_time' : 'expire_timestamp', '>=', isMad ? this.knex().fn.now() : safeTs)
       .andWhereBetween(isMad ? 'pokemon.latitude' : 'lat', [args.minLat, args.maxLat])
       .andWhereBetween(isMad ? 'pokemon.longitude' : 'lon', [args.minLon, args.maxLon])
       .andWhere(ivOr => {
@@ -246,7 +260,7 @@ class Pokemon extends Model {
           ivOr.orWhere(isMad ? raw(ivCalc) : 'iv', 100)
         }
       })
-    if (areaRestrictions.length > 0) {
+    if (areaRestrictions?.length > 0) {
       getAreaSql(query, areaRestrictions, isMad, 'pokemon')
     }
 
@@ -259,8 +273,7 @@ class Pokemon extends Model {
     results.forEach(pkmn => {
       let noPvp = true
       if (pkmn.pokemon_id === 132 && !pkmn.ditto_form) {
-        pkmn.ditto_form = pkmn.form
-        pkmn.form = masterfile[pkmn.pokemon_id].defaultFormId
+        handleDitto(pkmn)
       }
       if (!pkmn.seen_type) {
         if (pkmn.spawn_id === null) {
@@ -291,7 +304,7 @@ class Pokemon extends Model {
       } else {
         pvpQuery.select(['*', raw(true).as('pvpCheck')])
       }
-      pvpQuery.where(isMad ? 'disappear_time' : 'expire_timestamp', '>=', isMad ? this.knex().fn.now() : ts)
+      pvpQuery.where(isMad ? 'disappear_time' : 'expire_timestamp', '>=', isMad ? this.knex().fn.now() : safeTs)
         .andWhereBetween(isMad ? 'pokemon.latitude' : 'lat', [args.minLat, args.maxLat])
         .andWhereBetween(isMad ? 'pokemon.longitude' : 'lon', [args.minLon, args.maxLon])
       if (isMad && listOfIds.length > 0) {
@@ -309,7 +322,7 @@ class Pokemon extends Model {
             .orWhereNotNull('pvp_rankings_ultra_league')
         })
       }
-      if (areaRestrictions.length > 0) {
+      if (areaRestrictions?.length > 0) {
         getAreaSql(pvpQuery, areaRestrictions, isMad, 'pokemon')
       }
       pvpResults.push(...await pvpQuery)
@@ -321,9 +334,8 @@ class Pokemon extends Model {
       const filterId = `${pkmn.pokemon_id}-${pkmn.form}`
       pkmn.cleanPvp = {}
       pkmn.bestPvp = 4096
-      if (pkmn.pokemon_id === 132) {
-        pkmn.ditto_form = pkmn.form
-        pkmn.form = masterfile[pkmn.pokemon_id].defaultFormId
+      if (pkmn.pokemon_id === 132 && !pkmn.ditto_form && pkmn.pvpCheck) {
+        handleDitto(pkmn)
       }
       if (!pkmn.seen_type) pkmn.seen_type = 'encounter'
       Object.keys(parsed).forEach(league => {
@@ -341,16 +353,21 @@ class Pokemon extends Model {
   }
 
   static getOhbemPvp(pokemon) {
-    return ohbem.queryPvPRank(
-      pokemon.pokemon_id,
-      pokemon.form,
-      pokemon.costume,
-      pokemon.gender,
-      pokemon.atk_iv,
-      pokemon.def_iv,
-      pokemon.sta_iv,
-      pokemon.level,
-    )
+    try {
+      return ohbem.queryPvPRank(
+        pokemon.pokemon_id,
+        pokemon.form,
+        pokemon.costume,
+        pokemon.gender,
+        pokemon.atk_iv,
+        pokemon.def_iv,
+        pokemon.sta_iv,
+        pokemon.level,
+      )
+    } catch (e) {
+      console.error('Unable to process PVP Stats for Pokemon with ID#: ', pokemon.id, '\n', e.message)
+      return {}
+    }
   }
 
   static async getLegacy(args, perms, isMad) {
@@ -361,6 +378,9 @@ class Pokemon extends Model {
       .andWhereBetween(isMad ? 'pokemon.longitude' : 'lon', [args.minLon, args.maxLon])
     if (isMad) {
       getMadSql(query)
+    }
+    if (perms.areaRestrictions?.length > 0) {
+      getAreaSql(query, perms.areaRestrictions, isMad, 'pokemon')
     }
     const results = await query
     return legacyFilter(results, args, perms, ohbem)

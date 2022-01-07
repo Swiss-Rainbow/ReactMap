@@ -2,16 +2,18 @@
 const fs = require('fs')
 const path = require('path')
 
-const fetchJson = require('./functions/fetchJson')
+const fetchJson = require('./api/fetchJson')
 
 const appLocalesFolder = path.resolve(__dirname, '../../../public/base-locales')
 const finalLocalesFolder = path.resolve(__dirname, '../../../public/locales')
 
-module.exports.locales = async function locales() {
+const locales = async () => {
   const localTranslations = await fs.promises.readdir(appLocalesFolder)
   const englishRef = fs.readFileSync(path.resolve(appLocalesFolder, 'en.json'), { encoding: 'utf8', flag: 'r' })
 
   fs.mkdir(finalLocalesFolder, (error) => error ? console.log('Locales folder already exists, skipping') : console.log('locales folder created'))
+
+  const availableRemote = await fetchJson('https://raw.githubusercontent.com/WatWowMap/pogo-translations/master/index.json')
 
   await Promise.all(localTranslations.map(async locale => {
     const reactMapTranslations = fs.readFileSync(path.resolve(appLocalesFolder, locale), { encoding: 'utf8', flag: 'r' })
@@ -21,7 +23,12 @@ module.exports.locales = async function locales() {
     fs.mkdir(`${finalLocalesFolder}/${baseName}`, (error) => error ? console.log(`${locale} already exists, skipping`) : console.log(`${locale} folder created`))
 
     try {
-      const remoteFiles = await fetchJson(`https://raw.githubusercontent.com/WatWowMap/pogo-translations/master/static/locales/${baseName}.json`)
+      const hasRemote = availableRemote.includes(locale)
+      const remoteFiles = await fetchJson(`https://raw.githubusercontent.com/WatWowMap/pogo-translations/master/static/locales/${hasRemote ? baseName : 'en'}.json`)
+
+      if (!hasRemote) {
+        console.warn('No remote translation found for', locale, 'using english')
+      }
 
       Object.keys(remoteFiles).forEach(key => {
         if (!key.startsWith('desc_') && !key.startsWith('pokemon_category_')) {
@@ -40,8 +47,8 @@ module.exports.locales = async function locales() {
 
     const finalTranslations = {
       ...JSON.parse(englishRef),
-      ...JSON.parse(reactMapTranslations),
       ...trimmedRemoteFiles,
+      ...JSON.parse(reactMapTranslations),
     }
     fs.writeFile(
       path.resolve(finalLocalesFolder, baseName, 'translation.json'),
@@ -51,4 +58,10 @@ module.exports.locales = async function locales() {
     )
     console.log(`${locale}`, 'file saved.')
   }))
+}
+
+module.exports.locales = locales
+
+if (require.main === module) {
+  locales().then(() => console.log('Translations generated'))
 }

@@ -10,6 +10,9 @@ import getAllSubmissionCells from './queries/submissionCells'
 import { getOne, getAllNests } from './queries/nest'
 import getAllScanAreas from './queries/scanAreas'
 import * as searchIndex from './queries/search'
+import * as webhookIndex from './queries/webhook'
+import getGeocoder from './queries/geocoder'
+import * as user from './queries/user'
 
 export default class Query {
   static devices() {
@@ -111,10 +114,23 @@ export default class Query {
 
   static search(category) {
     switch (category) {
-      default: return searchIndex.poi
       case 'raids':
       case 'nests':
       case 'quests': return searchIndex[category]
+      case 'webhook': return searchIndex.poiWebhook
+      default: return searchIndex.poi
     }
+  }
+
+  static webhook(type) {
+    return webhookIndex[type]
+  }
+
+  static geocoder() {
+    return getGeocoder
+  }
+
+  static user(type) {
+    return user[type]
   }
 }

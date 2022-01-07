@@ -2,7 +2,7 @@
 /* eslint-disable no-restricted-syntax */
 const fs = require('fs')
 
-const fetchJson = require('./functions/fetchJson')
+const fetchJson = require('./api/fetchJson')
 const defaultRarity = require('../data/defaultRarity.json')
 
 const getRarityLevel = (id, pkmn) => {
@@ -24,13 +24,15 @@ const getRarityLevel = (id, pkmn) => {
   return rarity
 }
 
-module.exports.generate = async function generate() {
+const generate = async () => {
   try {
     const masterfile = await fetchJson('https://raw.githubusercontent.com/WatWowMap/Masterfile-Generator/master/master-latest-react-map.json')
 
     Object.values(masterfile.pokemon).forEach(pokemon => {
       pokemon.rarity = getRarityLevel(pokemon.pokedexId, pokemon)
       pokemon.types = pokemon.types || []
+      delete pokemon.mythical
+      delete pokemon.legendary
     })
 
     fs.writeFile(
@@ -39,8 +41,13 @@ module.exports.generate = async function generate() {
       'utf8',
       () => { },
     )
-    console.log('New masterfile generated')
   } catch (e) {
     console.warn('Unable to generate new masterfile, using existing.')
   }
+}
+
+module.exports.generate = generate
+
+if (require.main === module) {
+  generate().then(() => console.log('Masterfile generated'))
 }

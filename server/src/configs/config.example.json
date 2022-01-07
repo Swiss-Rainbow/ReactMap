@@ -3,6 +3,7 @@
   "port": 8080,
   "api": {
     "sessionSecret": "98ki^e72~!@#(85o3kXLI*#c9wu5l!Z",
+    "reactMapSecret": "You Should Change Me",
     "maxSessions": 5,
     "queryAvailable": {
       "pokemon": true,
@@ -82,6 +83,7 @@
     "clientId": "",
     "clientSecret": "",
     "redirectUri": "http://localhost:8080/auth/discord/callback",
+    "inviteLink": "",
     "allowedGuilds": [],
     "blockedGuilds": [],
     "allowedUsers": [],
@@ -240,6 +242,10 @@
       {
         "name": "Shuffle",
         "path": "https://raw.githubusercontent.com/nileplumb/PkmnShuffleMap/master/UICONS/"
+      },
+      {
+        "name": "Half Shiny",
+        "path": "https://raw.githubusercontent.com/jms412/PkmnShuffleMap/master/UICONS_Half_Shiny_Sparkles_256/"
       }
     ]
   },
